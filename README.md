@@ -1,3 +1,3 @@
-# socketfun
-c socket programming
+# linuxfun
+linux programming
 # wait for commit
