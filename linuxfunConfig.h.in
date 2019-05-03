@@ -1,0 +1,2 @@
+#define linuxfun_VERSION_MAJOR @linuxfun_VERSION_MAJOR@
+#define linuxfun_VERSION_MINOR @linuxfun_VERSION_MINOR@
