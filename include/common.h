@@ -9,6 +9,8 @@
 #include <arpa/inet.h> 
 #include <time.h>
 #include <signal.h>
+#include <sys/stat.h>
+
 
 #define mff_RETURN_OK 1
 #define mff_RETURN_ERROR -1
