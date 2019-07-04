@@ -62,8 +62,6 @@ int main(int argc, char **argv)
 
     setnonblocking(listenfd);
 
-    printf("%d\n", ret);
-
     ret = listen(listenfd, 5);
     assert(ret != -1);
 
@@ -76,7 +74,7 @@ int main(int argc, char **argv)
         struct sockaddr_in client_addr;
         socklen_t client_addr_length = sizeof(client_addr);
         int clientfd;
-        if ((clientfd = accept(listenfd, (struct sockaddr *)&client_addr, &client_addr_length)) >= 0)
+        if ((clientfd = accept(listenfd, (struct sockaddr *)&client_addr, &client_addr_length)) > 0)
         {
             printf("Connected from %s\n", inet_ntoa(client_addr.sin_addr));
             users[current_users].sockfd = clientfd;
@@ -92,14 +90,13 @@ int main(int argc, char **argv)
             //将当前连接句柄加入到集合中
             for (int i = 0; i < current_users; i++)
             {
-                printf("%d\n",users[current_users].sockfd);
-                FD_SET(users[current_users].sockfd, &rfds);
-                maxfd = maxfd > users[current_users].sockfd ? maxfd : users[current_users].sockfd;
+            //    printf("%d\n",users[i].sockfd);
+                FD_SET(users[i].sockfd, &rfds);
+                maxfd = maxfd > users[i].sockfd ? maxfd : users[i].sockfd;
             }
             struct timeval tv;
             tv.tv_sec = 0;
             tv.tv_usec = 0;
-        //    printf("%d\n",maxfd);
             ret = select(maxfd + 1, &rfds, NULL, NULL, &tv);
             if (ret == -1)
             {
@@ -112,19 +109,18 @@ int main(int argc, char **argv)
             {
                 for (int i = 0; i < current_users; i++)
                 {
-                    printf("aa\n");
-                    if (FD_ISSET(users[current_users].sockfd, &rfds))
+                    if (FD_ISSET(users[i].sockfd, &rfds))
                     { //socket有消息
-                        bzero(users[current_users].buffer, BUFFER_SIZE);
-                        int len = recv(users[current_users].sockfd, users[current_users].buffer, BUFFER_SIZE, 0);
-
+                        bzero(users[i].buffer, BUFFER_SIZE);
+                        int len = recv(users[i].sockfd, users[i].buffer, BUFFER_SIZE, 0);
                         if (len > 0)
                         {
-                            printf("recv from client[%d]: %s\n", users[current_users].sockfd, users[current_users].buffer);
+                            printf("recv from client[%d]: %s\n", users[i].sockfd, users[i].buffer);
                         }
                         else if (len == 0)
                         {
-                            printf("client %d disconnected!\n", users[current_users].sockfd);
+                            printf("client %d disconnected!\n", users[i].sockfd);
+                             current_users--;
                             break;
                         }
                     }
@@ -132,7 +128,6 @@ int main(int argc, char **argv)
             }
         } //内while
 
-        //   printf("aaaa");
     }
 
     free(users);
