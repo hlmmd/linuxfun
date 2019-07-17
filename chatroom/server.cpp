@@ -10,10 +10,14 @@
 #include <string.h>
 #include <stdlib.h>
 #include <fcntl.h>
+#include <vector>
+#include <unordered_map>
 
-#define USER_LIMIT 5   /* 最大用户数  */
-#define BUFFER_SIZE 64 //  缓冲区大小
-#define FD_LIMIT 65535 // fd限制
+#define USER_LIMIT 1000 /* 最大用户数  */
+#define BUFFER_SIZE 64  //  缓冲区大小
+#define FD_LIMIT 65535  // fd限制
+
+using namespace std;
 
 struct client_data
 {
@@ -65,72 +69,102 @@ int main(int argc, char **argv)
     ret = listen(listenfd, 5);
     assert(ret != -1);
 
-    client_data *users = (client_data *)malloc(sizeof(client_data) * USER_LIMIT);
+    vector<client_data> users(USER_LIMIT);
+
+    for (int i = 0; i < users.size(); i++)
+    {
+        //设置为-1表示未使用
+        users[i].sockfd = -1;
+    }
+
+    unordered_map<int, int> user_map;
 
     int current_users = 0;
+    int user_index = 0;
 
     while (1)
     {
-        struct sockaddr_in client_addr;
-        socklen_t client_addr_length = sizeof(client_addr);
-        int clientfd;
-        if ((clientfd = accept(listenfd, (struct sockaddr *)&client_addr, &client_addr_length)) > 0)
+        fd_set rfds;
+        int maxfd = listenfd;
+        //清空集合
+        FD_ZERO(&rfds);
+        //将当前连接和listen socket句柄加入到集合中
+        FD_SET(listenfd, &rfds);
+
+        for (auto it = user_map.begin(); it != user_map.end(); it++)
         {
-            printf("Connected from %s\n", inet_ntoa(client_addr.sin_addr));
-            users[current_users].sockfd = clientfd;
-            current_users++;
+            int userfd = users[it->second].sockfd;
+            FD_SET(userfd, &rfds);
+            maxfd = maxfd > userfd ? maxfd : userfd;
         }
-        while (1)
+
+        ret = select(maxfd + 1, &rfds, NULL, NULL, NULL);
+        if (ret == -1)
         {
-            fd_set rfds;
-            int maxfd;
-            //清空集合
-            FD_ZERO(&rfds);
-            maxfd = 0;
-            //将当前连接句柄加入到集合中
-            for (int i = 0; i < current_users; i++)
+            printf("select error\n");
+            break;
+        }
+        else if (ret == 0)
+            continue;
+        else
+        {
+            //listenfd有可读事件，说明有新的连接，使用accept进行处理
+            if (FD_ISSET(listenfd, &rfds))
             {
-            //    printf("%d\n",users[i].sockfd);
-                FD_SET(users[i].sockfd, &rfds);
-                maxfd = maxfd > users[i].sockfd ? maxfd : users[i].sockfd;
-            }
-            struct timeval tv;
-            tv.tv_sec = 0;
-            tv.tv_usec = 0;
-            ret = select(maxfd + 1, &rfds, NULL, NULL, &tv);
-            if (ret == -1)
-            {
-                printf("select error\n");
-                break;
-            }
-            else if (ret == 0)
-                break;
-            else
-            {
-                for (int i = 0; i < current_users; i++)
+                struct sockaddr_in client_addr;
+                socklen_t client_addr_length = sizeof(client_addr);
+                int clientfd;
+                if ((clientfd = accept(listenfd, (struct sockaddr *)&client_addr, &client_addr_length)) > 0)
                 {
-                    if (FD_ISSET(users[i].sockfd, &rfds))
-                    { //socket有消息
-                        bzero(users[i].buffer, BUFFER_SIZE);
-                        int len = recv(users[i].sockfd, users[i].buffer, BUFFER_SIZE, 0);
-                        if (len > 0)
+                    printf("Connected from %s\n", inet_ntoa(client_addr.sin_addr));
+                    int unused = -1;
+                    for (int i = 0; i < users.size(); i++)
+                    {
+                        if (users[i].sockfd == -1)
                         {
-                            printf("recv from client[%d]: %s\n", users[i].sockfd, users[i].buffer);
-                        }
-                        else if (len == 0)
-                        {
-                            printf("client %d disconnected!\n", users[i].sockfd);
-                             current_users--;
+                            unused = i;
                             break;
                         }
                     }
+                    user_map[user_index] = unused;
+                    users[unused].sockfd = clientfd;
+                    current_users++;
+                    user_index++;
                 }
             }
-        } //内while
 
+            for (auto it = user_map.begin(); it != user_map.end();)
+            {
+                auto user_data = users[it->second];
+                //int userfd = users[it->second].sockfd;
+                bool deleteflag = false;
+                if (FD_ISSET(user_data.sockfd, &rfds))
+                {
+                    bzero(user_data.buffer, BUFFER_SIZE);
+                    int len = recv(user_data.sockfd, user_data.buffer, BUFFER_SIZE, 0);
+                    if (len > 0)
+                    {
+                        printf("recv from client[%d]: %s\n", user_data.sockfd, user_data.buffer);
+                    }
+                    else if (len == 0)
+                    {
+                        printf("client %d disconnected!\n", user_data.sockfd);
+                        user_data.sockfd = -1;
+                        current_users--;
+                        deleteflag = true;
+                        auto tempit = it;
+                        auto nextit = ++it;
+                        user_map.erase(tempit);
+                        it = nextit;
+                    }
+                }
+                if (deleteflag == false)
+                    it++;
+            }
+        }
     }
 
-    free(users);
+    //   free(users);
     close(listenfd);
 
     return 0;
