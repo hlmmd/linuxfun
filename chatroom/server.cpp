@@ -66,7 +66,7 @@ int main(int argc, char **argv)
 
     setnonblocking(listenfd);
 
-    ret = listen(listenfd, 5);
+    ret = listen(listenfd, 10);
     assert(ret != -1);
 
     vector<client_data> users(USER_LIMIT);
@@ -116,6 +116,12 @@ int main(int argc, char **argv)
                 int clientfd;
                 if ((clientfd = accept(listenfd, (struct sockaddr *)&client_addr, &client_addr_length)) > 0)
                 {
+                    if (current_users >= USER_LIMIT)
+                    {
+                        close(clientfd);
+                        continue;
+                    }
+
                     printf("Connected from %s\n", inet_ntoa(client_addr.sin_addr));
                     int unused = -1;
                     for (int i = 0; i < users.size(); i++)
@@ -131,6 +137,7 @@ int main(int argc, char **argv)
                     current_users++;
                     user_index++;
                 }
+                printf("current user number: %d\n", current_users);
             }
 
             for (auto it = user_map.begin(); it != user_map.end();)
@@ -151,6 +158,7 @@ int main(int argc, char **argv)
                         printf("client %d disconnected!\n", user_data.sockfd);
                         user_data.sockfd = -1;
                         current_users--;
+                        printf("current user number: %d\n", current_users);
                         deleteflag = true;
                         auto tempit = it;
                         auto nextit = ++it;
