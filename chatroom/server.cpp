@@ -143,7 +143,6 @@ int main(int argc, char **argv)
             for (auto it = user_map.begin(); it != user_map.end();)
             {
                 auto user_data = users[it->second];
-                //int userfd = users[it->second].sockfd;
                 bool deleteflag = false;
                 if (FD_ISSET(user_data.sockfd, &rfds))
                 {
