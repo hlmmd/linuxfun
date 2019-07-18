@@ -14,9 +14,10 @@
 #include <unordered_map>
 #include <sys/epoll.h>
 #include <pthread.h>
+#include <sys/resource.h>
 
 #define USER_LIMIT 1000000 /* 最大用户数  */
-#define BUFFER_SIZE 64     //  缓冲区大小
+#define BUFFER_SIZE 32     //  缓冲区大小
 //#define FD_LIMIT 65535   // fd限制
 
 using namespace std;
@@ -68,8 +69,14 @@ void et(epoll_event *events, int number, int epollfd, int listenfd)
                 if (connected >= USER_LIMIT)
                     continue;
                 int connfd = accept(listenfd, (struct sockaddr *)&client_address, &client_addrlength);
-                if (connfd < 0 && (errno == EAGAIN || errno == ECONNABORTED || errno == EPROTO || errno == EINTR))
+             //   if (connfd < 0 && (errno == EAGAIN || errno == ECONNABORTED || errno == EPROTO || errno == EINTR))
+                if (connfd < 0 && (errno == EAGAIN ))
                     break;
+                else if (connfd < 0)
+                {
+                    printf("<0\n");
+                }
+
                 addfd(epollfd, connfd, true);
                 printf("current user:%d\n", connected);
             }
@@ -84,7 +91,7 @@ void et(epoll_event *events, int number, int epollfd, int listenfd)
                 {
                     if ((errno == EAGAIN) || (errno == EWOULDBLOCK))
                     {
-                        printf("read later\n");
+                        //     printf("read later\n");
                         break;
                     }
                     close(sockfd);
@@ -100,7 +107,7 @@ void et(epoll_event *events, int number, int epollfd, int listenfd)
                 }
                 else
                 {
-                    printf("get %d bytes of content: %s\n", ret, buf);
+                    //      printf("get %d bytes of content: %s\n", ret, buf);
                 }
             }
         }
@@ -143,6 +150,12 @@ int main(int argc, char **argv)
 
     ret = listen(listenfd, 10);
     assert(ret != -1);
+
+    // struct rlimit rt;
+    // struct rlimit limit;
+    // if (getrlimit(RLIMIT_NOFILE, &limit) == -1)
+    //     ; //   handle_error("getrlimit");
+    // printf("getrlimit = %d\n", (int)limit.rlim_cur);
 
     epoll_event *events = (epoll_event *)malloc(sizeof(epoll_event) * USER_LIMIT);
     int epollfd = epoll_create(USER_LIMIT);
