@@ -176,6 +176,10 @@ void run(void)
     struct event *listener_event;
 
     base = event_base_new();
+
+    //printf("%s\n",base->evsel->name);
+    //  printf("%d",sizeof(struct event_base));
+
     if (!base)
         return; /*XXXerr*/
 
